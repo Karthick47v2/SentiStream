@@ -23,6 +23,7 @@ start = time()
 
 # ---------------- Initial training of classifier ----------------
 # Train word vector {Word2Vec or FastText} on {nrows=1000} data and get word embeddings, then use
+
 # that embedding to train NN sentiment classifier {ANN or HAN}
 TrainModel(word_vector_algo=config.WORD_VEC_ALGO,
            ssl_model=config.SSL_MODEL, init=True, nrows=5600, vector_size=20)
@@ -94,7 +95,7 @@ else:
 
     # TODO: DO IT PARALLELy
     for idx, message in enumerate(consumer):  # 515099
-
+        print(f'Processing message {idx}... {time() - start:.2f} seconds elapsed.')
         # TODO: REMOVE --- ONLY FOR FAST DEBUGGING
         if idx < 5600:
             continue

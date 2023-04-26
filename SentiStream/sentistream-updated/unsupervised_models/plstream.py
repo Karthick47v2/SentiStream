@@ -12,6 +12,7 @@ import pdb
 from sklearn.cluster import KMeans
 import pandas as pd
 import numpy as np
+from utils import clean_for_wv, tokenize, train_word_vector_algo, get_average_word_embeddings
 
 class PLStream():
     """
@@ -104,6 +105,8 @@ class PLStream():
         self.neg_ref_vec = []
         self.pos_ref_mean = []
         self.neg_ref_mean = []
+
+
     def create_lexicon(self):
         self.neg_ref_vec = [self.wv_model.wv[word]
                         for word in self.neg_ref if word in self.wv_model.wv.key_to_index]
@@ -117,38 +120,52 @@ class PLStream():
         self.pos_ref_mean = self.pos_ref_vec.sum(axis=0)
         self.pos_ref_mean = self.pos_ref_mean / self.pos_ref_vec.shape[0]
 
-    def update_word_lists(self, sentence_vectors, sentence_labels):
+    def update_word_lists(self, sentence_vectors):
+        print('!!!')
         # Combine the negative and positive word vectors into one list
-        lexicon_size = len(self.pos_ref)+len(self.neg_ref)+len(sentence_labels)
+        lexicon_size = len(self.pos_ref)+len(self.neg_ref)
+
+        labels, texts = zip(*sentence_vectors)
+
+
+        filtered_tokens = [clean_for_wv(t) for t in texts]
+        sen_embeddings = get_average_word_embeddings(
+            self.wv_model, filtered_tokens)
 
         # Add the sentence vectors to the combined word vectors
-        for sent_vec, label in zip(sentence_vectors, sentence_labels):
-            if label == 'negative':
-                self.neg_ref.append(sent_vec)
-            elif label == 'positive':
-                self.pos_ref.append(sent_vec)
+        for sent_vec, label in zip(sen_embeddings, labels):
+
+
+            if label == 0:
+
+                self.neg_ref_vec = np.vstack([self.neg_ref_vec, sent_vec])
+            elif label == 1:
+                self.pos_ref_vec = np.vstack([self.pos_ref_vec, sent_vec])
         # Check if the threshold is exceeded
         if lexicon_size > self.lexicon_size:
             # Determine the number of clusters for negative and positive sentiments
-            if len(self.neg_ref) > self.lexicon_size/2:
+            if len(self.neg_ref_vec.shape[0]) > self.lexicon_size/2:
                 n_clusters_positive = self.lexicon_size/2
-            if len(self.pos_ref) > self.lexicon_size/2:
-                n_clusters_positive = lself.lexicon_size/2
+            if len(self.pos_ref_vec.shape[0]) > self.lexicon_size/2:
+                n_clusters_positive = self.lexicon_size/2
 
 
             # Perform KMeans clustering for negative sentiment
             kmeans_negative = KMeans(n_clusters=n_clusters_negative)
-            kmeans_negative.fit(negative_vectors)
-            new_negative_centroids = kmeans_negative.cluster_centers_
+            kmeans_negative.fit(self.neg_ref_vec)
+            self.neg_ref_vec = kmeans_negative.cluster_centers_
 
             # Perform KMeans clustering for positive sentiment
             kmeans_positive = KMeans(n_clusters=n_clusters_positive)
-            kmeans_positive.fit(positive_vectors)
-            new_positive_centroids = kmeans_positive.cluster_centers_
-
+            kmeans_positive.fit(self.pos_ref_vec)
+            self.pos_ref_vec = kmeans_positive.cluster_centers_
+            # get means
+            self.neg_ref_mean = self.neg_ref_vec.sum(axis=0)
+            self.neg_ref_mean = self.neg_ref_mean / self.neg_ref_vec.shape[0]
+            self.pos_ref_mean = self.pos_ref_vec.sum(axis=0)
+            self.pos_ref_mean = self.pos_ref_mean / self.pos_ref_vec.shape[0]
             # Replace the original word lists with the centroids
-            self.neg_ref = list(new_negative_centroids)
-            self.pos_ref = list(new_positive_centroids)
+
 
         return config.FINISHED
     def load_updated_model(self):
@@ -231,6 +248,7 @@ class PLStream():
         """
 
         # Calculate average word embeddings for text.
+
         doc_embeddings = get_average_word_embeddings(
             self.wv_model, sent_tokens)
 

@@ -143,7 +143,8 @@ else:
             if dump:
                 message = model_trainer.update_model(dump, 0.4, 0.2)
                 plstream.create_lexicon()
-                #message_us = plstream.update_word_lists(dump)
+
+                message_us = plstream.update_word_lists(dump)
                 # if message == config.FINISHED && message_us == config.FINISHED:
                 #     dump = []
                 if message == config.FINISHED:

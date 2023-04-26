@@ -17,7 +17,7 @@ from train.pseudo_labeler import SentimentPseudoLabeler, PseudoLabelerCoMap
 from unsupervised_models.plstream import PLStream
 from inference.classifier import Classifier
 from utils import tokenize
-
+import pdb
 
 start = time()
 
@@ -84,18 +84,19 @@ else:
         enable_auto_commit=True,
         value_deserializer=lambda x: x.decode('utf-8')
     )
+    # using wv: word list to vector list: must pretraining wv before create
+    plstream.create_lexicon()
 
     us_predictions = []
     ss_predictions = []
 
     pseudo_data = []
     dump = []
-
     acc_list = []
 
     # TODO: DO IT PARALLELy
     for idx, message in enumerate(consumer):  # 515099
-        print(f'Processing message {idx}... {time() - start:.2f} seconds elapsed.')
+        #print(f'Processing message {idx}... {time() - start:.2f} seconds elapsed.')
         # TODO: REMOVE --- ONLY FOR FAST DEBUGGING
         if idx < 5600:
             continue
@@ -103,7 +104,6 @@ else:
         # arrive and not finish the program.
         if idx > 20000:
             break
-
         label, text = message.value.split('|||', 1)
         label = int(label)
 
@@ -113,31 +113,39 @@ else:
 
         ss_output = classifier.classify((idx, label, text))
 
+        # ?
         if us_output != config.BATCHING:
             us_predictions += us_output
         if ss_output != config.BATCHING:
             ss_predictions += ss_output
-
+        # what is the temp
         temp = []
 
         # TODO: MAKE PSEUDO LABELR, INF  AS  BATCH PROC
         if len(ss_predictions) > 0 or len(us_predictions) > 0:
+
             temp = pseduo_labeler.generate_pseudo_label(
                 us_predictions, ss_predictions)
+
             acc_list.append(pseduo_labeler.get_model_acc())
             us_predictions, ss_predictions = [], []
 
         if temp and temp != [config.BATCHING]:
             for data in temp:
                 dump.append(data[1:])
-                # inference.classify((data[0], data[1], data[2]))
+
+              
+
 
         # dump.append([label, text]) # DEBUG - WITH GROUND TRUTH
 
         if idx % 5000 == 0:
             if dump:
                 message = model_trainer.update_model(dump, 0.4, 0.2)
-
+                plstream.create_lexicon()
+                #message_us = plstream.update_word_lists(dump)
+                # if message == config.FINISHED && message_us == config.FINISHED:
+                #     dump = []
                 if message == config.FINISHED:
                     dump = []
 

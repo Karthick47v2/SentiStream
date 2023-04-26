@@ -5,7 +5,7 @@ from gensim.models import Word2Vec, FastText
 PYFLINK = False
 
 # SentiStream
-SSL_MODEL = 'ANN'  # 'HAN', 'ANN'
+SSL_MODEL = 'HAN'  # 'HAN', 'ANN'
 # Word2Vec, FastText ---------------WORD2VEC is BETTER IN PERFORMANCE
 WORD_VEC_ALGO = Word2Vec
 STEM = True  # TODO: REMOVE FROM HERE

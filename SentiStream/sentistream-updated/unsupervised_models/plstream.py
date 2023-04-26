@@ -8,7 +8,10 @@ import config
 
 from unsupervised_models.utils import cos_similarity, text_similarity
 from utils import train_word_vector_algo, get_average_word_embeddings, clean_for_wv
-
+import pdb
+from sklearn.cluster import KMeans
+import pandas as pd
+import numpy as np
 
 class PLStream():
     """
@@ -64,7 +67,7 @@ class PLStream():
         self.text_similarity_list = []
         self.count = 0
         self.count2 = 0
-
+        self.lexicon_size = 100
         # Initialize word vector model.
         # num_workers = int(0.5 * multiprocessing.cpu_count()
         #   )  # Best value for batch of 250.
@@ -92,10 +95,62 @@ class PLStream():
                             'boring', 'awful', 'unwatchable', 'awkward', 'bullshi', 'fraud',
                             'abuse', 'outrange', 'disgust'}
 
+        #for i in self.neg_ref:
+
         self.idx = []
         self.labels = []
         self.texts = []
+        self.pos_ref_vec = []
+        self.neg_ref_vec = []
+        self.pos_ref_mean = []
+        self.neg_ref_mean = []
+    def create_lexicon(self):
+        self.neg_ref_vec = [self.wv_model.wv[word]
+                        for word in self.neg_ref if word in self.wv_model.wv.key_to_index]
+        self.neg_ref_vec = np.array(self.neg_ref_vec)
 
+        self.pos_ref_vec = [self.wv_model.wv[word]
+                        for word in self.pos_ref if word in self.wv_model.wv.key_to_index]
+        self.pos_ref_vec = np.array(self.pos_ref_vec)
+        self.neg_ref_mean = self.neg_ref_vec.sum(axis=0)
+        self.neg_ref_mean = self.neg_ref_mean  / self.neg_ref_vec.shape[0]
+        self.pos_ref_mean = self.pos_ref_vec.sum(axis=0)
+        self.pos_ref_mean = self.pos_ref_mean / self.pos_ref_vec.shape[0]
+
+    def update_word_lists(self, sentence_vectors, sentence_labels):
+        # Combine the negative and positive word vectors into one list
+        lexicon_size = len(self.pos_ref)+len(self.neg_ref)+len(sentence_labels)
+
+        # Add the sentence vectors to the combined word vectors
+        for sent_vec, label in zip(sentence_vectors, sentence_labels):
+            if label == 'negative':
+                self.neg_ref.append(sent_vec)
+            elif label == 'positive':
+                self.pos_ref.append(sent_vec)
+        # Check if the threshold is exceeded
+        if lexicon_size > self.lexicon_size:
+            # Determine the number of clusters for negative and positive sentiments
+            if len(self.neg_ref) > self.lexicon_size/2:
+                n_clusters_positive = self.lexicon_size/2
+            if len(self.pos_ref) > self.lexicon_size/2:
+                n_clusters_positive = lself.lexicon_size/2
+
+
+            # Perform KMeans clustering for negative sentiment
+            kmeans_negative = KMeans(n_clusters=n_clusters_negative)
+            kmeans_negative.fit(negative_vectors)
+            new_negative_centroids = kmeans_negative.cluster_centers_
+
+            # Perform KMeans clustering for positive sentiment
+            kmeans_positive = KMeans(n_clusters=n_clusters_positive)
+            kmeans_positive.fit(positive_vectors)
+            new_positive_centroids = kmeans_positive.cluster_centers_
+
+            # Replace the original word lists with the centroids
+            self.neg_ref = list(new_negative_centroids)
+            self.pos_ref = list(new_positive_centroids)
+
+        return config.FINISHED
     def load_updated_model(self):
         """
         Load updated model from local.
@@ -182,11 +237,13 @@ class PLStream():
         confidence, y_preds = [], []
         y_tt_preds, y_ts_preds = [], []
         for idx, embeddings in enumerate(doc_embeddings):
+
+
             conf, y_pred = self.predict(embeddings)
-            # confidence.append(conf)
+            confidence.append(conf)
             y_preds.append(y_pred)
 
-            conf_ts, y_ts_pred = self.predict(
+            conf_ts, y_ts_pred = self.predict_t(
                 embeddings, sent_tokens[idx], temp='t')
             confidence.append(conf_ts)
             y_ts_preds.append(y_ts_pred)
@@ -222,10 +279,28 @@ class PLStream():
         Returns:
             tuple: Confidence of predicted label and predicted label.
         """
+        cos_sim_neg = cos_similarity(vector,self.neg_ref_mean)
+        cos_sim_pos = cos_similarity(vector,self.pos_ref_mean)
 
-        cos_sim_pos = [cos_similarity(
-            vector, self.wv_model.wv[word])
+        if cos_sim_neg > cos_sim_pos:
+
+            return (cos_sim_neg + 1)/2, 0
+        return (cos_sim_pos + 1)/2, 1
+
+    def predict_t(self, vector, tokens=None, temp=None):
+        """
+        Predict polarity of text based using PLStream.
+
+        Args:
+            vector (list): Tokenized words in a text.
+
+        Returns:
+            tuple: Confidence of predicted label and predicted label.
+        """
+
+        cos_sim_pos = [cos_similarity(vector, self.wv_model.wv[word])
             for word in self.pos_ref if word in self.wv_model.wv.key_to_index]
+
         cos_sim_neg = [cos_similarity(
             vector, self.wv_model.wv[word])
             for word in self.neg_ref if word in self.wv_model.wv.key_to_index]
@@ -269,6 +344,8 @@ class PLStream():
         #         return cos_sim_neg - cos_sim_pos, 0
         #     return cos_sim_pos - cos_sim_neg, 1
 
+
         if cos_sim_neg > cos_sim_pos:
+
             return (cos_sim_neg + 1)/2, 0
         return (cos_sim_pos + 1)/2, 1

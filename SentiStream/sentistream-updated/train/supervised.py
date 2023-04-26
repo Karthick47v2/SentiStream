@@ -129,6 +129,7 @@ class TrainModel:
                           for key in self.wv_model.wv.index_to_key]
 
         # Train word vector model.
+        # ?
         train_word_vector_algo(
             self.wv_model, self.filtered_tokens, config.SSL_WV, True)
 

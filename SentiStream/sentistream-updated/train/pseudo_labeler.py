@@ -31,7 +31,7 @@ class SentimentPseudoLabeler:
 
     POS_LEARNING_EFFECT = 0
     NEG_LEARNING_EFFECT = 0
-
+    # ?
     ADAPTIVE_POS_LE_GAP = 0.03
     ADAPTIVE_NEG_LE_GAP = 0.03
 

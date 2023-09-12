@@ -131,12 +131,15 @@ class Evaluation(CoMapFunction):
         # return abs(plstream_conf) < abs(clf_conf)
 
     def calc_auc(self, ls, my_dict, other_dict):
+        # Initialize the confidence scores for the PLStream and classifier
         plstream_conf = 0
         clf_conf = 0
 
+        # Initialize variables to store the true label and the predicted probability
         true_label = None
         pred_prob = None
 
+        # Get the values associated with the key ls[0] from both dictionaries
         other_val = other_dict.get(ls[0])
         my_val = my_dict.get(ls[0])
 

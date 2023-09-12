@@ -5,7 +5,7 @@ from pyflink.common.typeinfo import Types
 from pyflink.common.serialization import Encoder
 from pyflink.datastream import CoMapFunction, StreamExecutionEnvironment, CheckpointingMode
 from pyflink.datastream.connectors import StreamingFileSink
-
+from sklearn.metrics import roc_auc_score
 from PLStream import unsupervised_stream
 from classifier import classifier
 
@@ -129,7 +129,35 @@ class Evaluation(CoMapFunction):
         # return ('1', 'pls' if plstream_conf > clf_conf else 'clf')
         # return other_val, my_val
         # return abs(plstream_conf) < abs(clf_conf)
-    
+
+    def calc_auc(self, ls, my_dict, other_dict):
+        plstream_conf = 0
+        clf_conf = 0
+
+        true_label = None
+        pred_prob = None
+
+        other_val = other_dict.get(ls[0])
+        my_val = my_dict.get(ls[0])
+
+        if isinstance(my_val[2], dict):
+            plstream_conf = my_val[0] * polarity(
+                my_val[1]) * Evaluation.ADAPTIVE_PLSTREAM_ACC_THRESHOLD
+            clf_conf = other_val[0] * polarity(
+                other_val[1]) * Evaluation.ADAPTIVE_CLASSIFIER_ACC_THRESHOLD
+            true_label = my_val[2]['true_label']
+            pred_prob = my_val[0] if abs(plstream_conf) > abs(clf_conf) else other_val[0]
+
+        else:
+            plstream_conf = other_val[0] * polarity(
+                other_val[1]) * Evaluation.ADAPTIVE_PLSTREAM_ACC_THRESHOLD
+            clf_conf = my_val[0] * polarity(
+                my_val[1]) * Evaluation.ADAPTIVE_CLASSIFIER_ACC_THRESHOLD
+            true_label = other_val[2]['true_label']
+            pred_prob = my_val[0] if abs(plstream_conf) < abs(clf_conf) else other_val[0]
+
+        return ('1', roc_auc_score([true_label], [pred_prob]))
+
 
     def calculate_confidence(self, ls, my_dict, other_dict):
         """
